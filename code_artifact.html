@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>용품사업부 재고금액(기준금액) 분석 대시보드</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PapaParse CDN for CSV files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- SheetJS CDN for Excel (.xlsx, .xls) files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans KR', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0265d2',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Noto Sans KR', 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .nav-tab-active {
+            background-color: #0284c7 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col md:flex-row">
+
+    <!-- Left Sidebar -->
+    <aside class="w-full md:w-64 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col justify-between shadow-xl z-20 border-r border-slate-800">
+        <div>
+            <!-- Sidebar Header / Logo -->
+            <div class="p-5 border-b border-slate-800 flex items-center space-x-3">
+                <div class="p-2.5 bg-blue-600 text-white rounded-xl shadow-md">
+                    <i data-lucide="boxes" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded border border-blue-500/30">용품사업부</span>
+                    </div>
+                    <h1 class="text-base font-bold text-white tracking-tight mt-0.5">재고 자산 관리 System</h1>
+                </div>
+            </div>
+
+            <!-- Left Navigation Tabs (Order: 대시보드 개요 -> 카테고리 분석 -> 데이터 탐색 -> 데이터 관리 -> 전체 보고서 보기) -->
+            <div class="p-4 space-y-1.5">
+                <div class="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">메인 메뉴</div>
+                
+                <!-- Tab 1: Overview (Default Active) -->
+                <button id="nav-overview" onclick="switchTab('overview')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition duration-150 text-slate-300 font-medium hover:bg-slate-800">
+                    <div class="flex items-center space-x-3">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-400"></i>
+                        <span>대시보드 개요</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 opacity-60"></i>
+                </button>
+
+                <!-- Tab 2: Category Analysis -->
+                <button id="nav-category" onclick="switchTab('category')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition duration-150 text-slate-300 font-medium hover:bg-slate-800">
+                    <div class="flex items-center space-x-3">
+                        <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-400"></i>
+                        <span>카테고리 분석</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 opacity-60"></i>
+                </button>
+
+                <!-- Tab 3: Data Navigation -->
+                <button id="nav-navigation" onclick="switchTab('navigation')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition duration-150 text-slate-300 font-medium hover:bg-slate-800">
+                    <div class="flex items-center space-x-3">
+                        <i data-lucide="search-code" class="w-4 h-4 text-emerald-400"></i>
+                        <span>데이터 탐색</span>
+                    </div>
+                    <span class="px-2 py-0.5 text-[10px] bg-blue-600 text-white font-bold rounded-full" id="sidebar-count-badge">0</span>
+                </button>
+
+                <!-- Tab 4: Data Management -->
+                <button id="nav-management" onclick="switchTab('management')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition duration-150 text-slate-300 font-medium hover:bg-slate-800">
+                    <div class="flex items-center space-x-3">
+                        <i data-lucide="database" class="w-4 h-4 text-purple-400"></i>
+                        <span>데이터 관리</span>
+                    </div>
+                    <span class="px-2 py-0.5 text-[10px] bg-purple-600 text-white font-bold rounded-full" id="sidebar-dataset-count-badge">0</span>
+                </button>
+
+                <!-- Tab 5: All View -->
+                <button id="nav-all" onclick="switchTab('all')" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition duration-150 text-slate-300 font-medium hover:bg-slate-800">
+                    <div class="flex items-center space-x-3">
+                        <i data-lucide="layers" class="w-4 h-4 text-amber-400"></i>
+                        <span>전체 보고서 보기</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-3.5 h-3.5 opacity-60"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sidebar Footer / Status Info & Upload Button -->
+        <div class="p-4 border-t border-slate-800 space-y-3">
+            <!-- Date Select Box -->
+            <div class="bg-slate-800/80 rounded-xl p-3 text-xs border border-slate-700/60 space-y-1">
+                <div class="flex items-center justify-between text-slate-400">
+                    <span class="text-[11px] font-medium">집계 기준일자 선택</span>
+                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-blue-400"></i>
+                </div>
+                <select id="sidebar-base-date-select" onchange="onDateChange(this.value)" class="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-lg px-2 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
+                    <option value="2026년 08월 26일">2026년 08월 26일</option>
+                </select>
+                <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                    <span>저장 상태:</span>
+                    <span id="storage-status-text" class="text-emerald-400 font-medium flex items-center gap-1">
+                        <i data-lucide="cloud" class="w-3 h-3"></i> 클라우드 동기화
+                    </span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="resetAllFilters()" class="flex-1 flex items-center justify-center space-x-1 text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg border border-slate-700 transition">
+                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                    <span>필터 초기화</span>
+                </button>
+                <button onclick="exportToCSV()" class="flex-1 flex items-center justify-center space-x-1 text-[11px] bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg font-medium shadow-sm transition">
+                    <i data-lucide="download" class="w-3 h-3"></i>
+                    <span>CSV 내보내기</span>
+                </button>
+            </div>
+
+            <!-- Upload Button -->
+            <button onclick="openUploadModal()" class="w-full flex items-center justify-center space-x-1.5 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg font-semibold shadow-sm hover:shadow-md transition">
+                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                <span>재고 데이터 업로드</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar">
+        
+        <!-- Header Bar -->
+        <header class="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-10 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+                <div class="flex items-center space-x-2 text-xs text-slate-500 mb-0.5">
+                    <span>용품사업부</span>
+                    <span>/</span>
+                    <span id="breadcrumb-active" class="font-semibold text-blue-600">대시보드 개요</span>
+                </div>
+                <h2 class="text-xl font-bold text-slate-900 tracking-tight" id="header-title">재고 자산 현황 대시보드 개요</h2>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <div class="text-right hidden sm:block">
+                    <div class="text-xs text-slate-400">선택 기준일 자산 총액</div>
+                    <div class="text-sm font-extrabold text-blue-700" id="header-total-amount">0 원</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Body Area -->
+        <main class="p-6 space-y-6 flex-1">
+
+            <!-- KPI Cards Bar -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Total Amount Card -->
+                <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">총 재고금액 (기준금액)</span>
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                            <i data-lucide="wallet" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-2xl font-extrabold text-slate-900 tracking-tight" id="kpi-total-amount">0 원</div>
+                        <div class="mt-1 flex items-center text-xs text-slate-500">
+                            <span class="text-blue-600 font-semibold mr-1" id="kpi-total-amount-unit">0 억원</span>
+                            <span>선택 기준일 전체 집계</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Quantity Card -->
+                <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">총 재고수량 (기준수량)</span>
+                        <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                            <i data-lucide="boxes" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-2xl font-extrabold text-slate-900 tracking-tight" id="kpi-total-qty">0 EA</div>
+                        <div class="mt-1 text-xs text-slate-500">
+                            전체 자산 보유 수량
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SKU Count Card -->
+                <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">관리 상품 수 (SKU)</span>
+                        <div class="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                            <i data-lucide="package" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-2xl font-extrabold text-slate-900 tracking-tight" id="kpi-total-sku">0 개</div>
+                        <div class="mt-1 text-xs text-slate-500">
+                            평균 상품당 기준금액: <span class="font-semibold text-slate-700" id="kpi-avg-amount">0원</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Warehouse / Category Summary Card -->
+                <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">최대 점유 카테고리</span>
+                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="text-lg font-bold text-slate-900 truncate" id="kpi-top-category">-</div>
+                        <div class="mt-1 text-xs text-slate-500 flex items-center justify-between">
+                            <span>기준금액 비중:</span>
+                            <span class="font-bold text-emerald-600" id="kpi-top-category-ratio">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB CONTENT CONTAINER 1: OVERVIEW CHARTS -->
+            <div id="tab-view-overview" class="space-y-6">
+                <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Major Category Breakdown (Donut Chart) -->
+                    <div class="lg:col-span-5 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                            <div>
+                                <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="donut" class="w-4 h-4 text-blue-600"></i>
+                                    대구분별 재고금액(기준금액) 비중
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-0.5">사업부 내 주요 대카테고리 자산 분포</p>
+                            </div>
+                        </div>
+                        <div class="relative flex-1 min-h-[280px] flex items-center justify-center">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Subcategory Breakdown (Horizontal Bar Chart) -->
+                    <div class="lg:col-span-7 bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                            <div>
+                                <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-600"></i>
+                                    중구분별 재고금액(기준금액) 순위
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-0.5">상위 중구분 항목별 기준금액 비교 분석</p>
+                            </div>
+                            <span class="text-xs text-indigo-600 bg-indigo-50 font-semibold px-2.5 py-1 rounded-full">Top Subcategories</span>
+                        </div>
+                        <div class="relative flex-1 min-h-[280px]">
+                            <canvas id="subcategoryChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Category Summary Matrix Table -->
+                <section class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="layers" class="w-4 h-4 text-slate-600"></i>
+                            대구분 - 중구분별 재고금액 요약 매트릭스
+                        </h3>
+                        <span class="text-xs text-slate-500">단위: 원 (%)</span>
+                    </div>
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-xs text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100/80 text-slate-700 font-semibold border-y border-slate-200">
+                                    <th class="py-2.5 px-4">대구분</th>
+                                    <th class="py-2.5 px-4">중구분 수</th>
+                                    <th class="py-2.5 px-4">품목 수(SKU)</th>
+                                    <th class="py-2.5 px-4 text-right">총 재고수량</th>
+                                    <th class="py-2.5 px-4 text-right">재고금액 (기준금액)</th>
+                                    <th class="py-2.5 px-4 text-right">전체 점유율</th>
+                                </tr>
+                            </thead>
+                            <tbody id="category-summary-tbody" class="divide-y divide-slate-100">
+                                <!-- Dynamic Matrix Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- TAB CONTENT CONTAINER 2: CATEGORY ANALYSIS VIEW -->
+            <div id="tab-view-category" class="space-y-6 hidden">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-base font-bold text-slate-900 mb-2">카테고리 입체 자산 현황</h3>
+                    <p class="text-xs text-slate-500 mb-6">사업부 내 카테고리별 비중과 금액 현황을 상세하게 파악할 수 있는 시각화 보고서입니다.</p>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="border border-slate-100 p-4 rounded-xl bg-slate-50/50">
+                            <h4 class="text-xs font-bold text-slate-700 mb-3">대구분 비율 분포</h4>
+                            <div class="relative h-64">
+                                <canvas id="categoryChartDetail"></canvas>
+                            </div>
+                        </div>
+                        <div class="border border-slate-100 p-4 rounded-xl bg-slate-50/50">
+                            <h4 class="text-xs font-bold text-slate-700 mb-3">중구분별 자산 순위</h4>
+                            <div class="relative h-64">
+                                <canvas id="subcategoryChartDetail"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB CONTENT CONTAINER 3: DATA NAVIGATION (DATA EXPLORATION) -->
+            <div id="tab-view-navigation" class="space-y-6 hidden">
+                <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <!-- Filter Bar Header -->
+                    <div class="p-5 bg-slate-900 text-white border-b border-slate-800">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                    <i data-lucide="search-code" class="w-5 h-5 text-emerald-400"></i>
+                                    데이터 탐색 및 조건 필터링 (Data Navigation)
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-1">대구분, 중구분, 소구분, 창고명별 기준금액을 다차원으로 검색하세요.</p>
+                            </div>
+                            <div class="flex items-center space-x-2 text-xs">
+                                <span class="text-slate-400">조회된 상품:</span>
+                                <span class="px-3 py-1 bg-blue-600 text-white rounded-full font-bold" id="filtered-count">0건</span>
+                            </div>
+                        </div>
+
+                        <!-- Filter Inputs Grid -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mt-4">
+                            <!-- Search Input -->
+                            <div class="relative">
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">상품명 / 코드 / 창고 검색</label>
+                                <div class="relative">
+                                    <input type="text" id="filter-search" oninput="handleFilterChange()" placeholder="상품명, 창고명..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+                                </div>
+                            </div>
+
+                            <!-- Major Category Select -->
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">대구분 선택</label>
+                                <select id="filter-category" onchange="handleCategoryChange()" class="w-full px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">전체 대구분</option>
+                                </select>
+                            </div>
+
+                            <!-- Mid Category Select -->
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">중구분 선택</label>
+                                <select id="filter-midcategory" onchange="handleMidCategoryChange()" class="w-full px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">전체 중구분</option>
+                                </select>
+                            </div>
+
+                            <!-- Sub Category Select -->
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">소구분 선택</label>
+                                <select id="filter-subcategory" onchange="handleFilterChange()" class="w-full px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">전체 소구분</option>
+                                </select>
+                            </div>
+
+                            <!-- Warehouse Select -->
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">창고 선택</label>
+                                <select id="filter-warehouse" onchange="handleFilterChange()" class="w-full px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">전체 창고</option>
+                                </select>
+                            </div>
+
+                            <!-- Sorting Select -->
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-400 mb-1">정렬 기준</label>
+                                <select id="filter-sort" onchange="handleFilterChange()" class="w-full px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="baseAmt-desc">기준금액 높은순</option>
+                                    <option value="baseAmt-asc">기준금액 낮은순</option>
+                                    <option value="baseQty-desc">기준수량 많은순</option>
+                                    <option value="name-asc">상품명 (가나다순)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Data Navigation Table (Order: No., 대구분, 중구분, 소구분, 원산지, 창고명, 상품명, 유통년도, 공급기준가, 기준원가, 기준수량, 기준금액, 상세) -->
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-3 w-10 text-center">No.</th>
+                                    <th class="py-3 px-3">대구분</th>
+                                    <th class="py-3 px-3">중구분</th>
+                                    <th class="py-3 px-3">소구분</th>
+                                    <th class="py-3 px-3 text-center">원산지</th>
+                                    <th class="py-3 px-3">창고명</th>
+                                    <th class="py-3 px-3">상품명</th>
+                                    <th class="py-3 px-3 text-center">유통년도</th>
+                                    <th class="py-3 px-3 text-right">공급기준가</th>
+                                    <th class="py-3 px-3 text-right">기준원가</th>
+                                    <th class="py-3 px-3 text-right">기준수량</th>
+                                    <th class="py-3 px-3 text-right font-bold text-slate-900 bg-blue-100/60">기준금액</th>
+                                    <th class="py-3 px-3 text-center">상세</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-tbody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Table Pagination Controls -->
+                    <div class="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+                        <div class="flex items-center space-x-2">
+                            <span>페이지당 항목:</span>
+                            <select id="page-size-select" onchange="changePageSize()" class="bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none">
+                                <option value="10">10개씩 보기</option>
+                                <option value="20" selected>20개씩 보기</option>
+                                <option value="50">50개씩 보기</option>
+                            </select>
+                            <span id="pagination-info" class="text-slate-500 ml-2">1 - 20 / 0개</span>
+                        </div>
+
+                        <!-- Page Buttons -->
+                        <div class="flex items-center space-x-1" id="pagination-buttons">
+                            <!-- Dynamic Page Buttons -->
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- TAB CONTENT CONTAINER 4: DATA MANAGEMENT VIEW -->
+            <div id="tab-view-management" class="space-y-6 hidden">
+                <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <i data-lucide="database" class="w-5 h-5 text-purple-600"></i>
+                                업로드 데이터 세트 관리 목록
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-1">
+                                업로드된 파일별 데이터 세트를 개별적으로 보관 및 관리합니다. 활성화할 데이터 세트를 선택하거나 관리할 수 있습니다.
+                            </p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="openUploadModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center space-x-1.5">
+                                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                                <span>새 데이터 업로드</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Dataset Metadata Stats -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-purple-50/60 p-4 rounded-xl border border-purple-100">
+                            <div class="text-xs font-medium text-purple-700">저장된 데이터 세트 수</div>
+                            <div class="text-xl font-extrabold text-purple-900 mt-1" id="mgmt-stat-total-datasets">0 개</div>
+                        </div>
+                        <div class="bg-blue-50/60 p-4 rounded-xl border border-blue-100">
+                            <div class="text-xs font-medium text-blue-700">현재 활성 세트 기준일자</div>
+                            <div class="text-xl font-extrabold text-blue-900 mt-1" id="mgmt-stat-active-date">-</div>
+                        </div>
+                        <div class="bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
+                            <div class="text-xs font-medium text-emerald-700">현재 세트 총 기준금액</div>
+                            <div class="text-xl font-extrabold text-emerald-900 mt-1" id="mgmt-stat-active-amount">0 원</div>
+                        </div>
+                    </div>
+
+                    <!-- Datasets List Table -->
+                    <div class="overflow-x-auto custom-scrollbar border border-slate-200 rounded-xl">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-4">데이터 세트명 / 파일명</th>
+                                    <th class="py-3 px-3">집계 기준일자</th>
+                                    <th class="py-3 px-3">업로드 일시</th>
+                                    <th class="py-3 px-3 text-center">품목 수(SKU)</th>
+                                    <th class="py-3 px-3 text-right">총 재고금액(기준금액)</th>
+                                    <th class="py-3 px-3 text-center">상태</th>
+                                    <th class="py-3 px-4 text-center">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody id="management-dataset-tbody" class="divide-y divide-slate-100 bg-white">
+                                <!-- Dynamic Dataset Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modal Dialog for SKU Detail View -->
+    <div id="sku-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100 transform transition-all">
+            <div class="bg-slate-900 text-white p-5 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="info" class="w-5 h-5 text-blue-400"></i>
+                    <h3 class="text-base font-bold" id="modal-sku-name">상품 상세 정보</h3>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 text-xs text-slate-700">
+                <div class="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">상품(코드)</span>
+                        <strong class="text-slate-900 text-xs" id="modal-sku-code">-</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">창고코드 / 창고명</span>
+                        <strong class="text-slate-900 text-xs" id="modal-sku-wh">-</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">유통년도 / 원산지</span>
+                        <strong class="text-slate-900 text-xs" id="modal-sku-year-origin">-</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">대구분</span>
+                        <strong class="text-slate-800" id="modal-sku-cat">-</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">중구분</span>
+                        <strong class="text-slate-800" id="modal-sku-midcat">-</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[11px]">소구분 / 가격등급</span>
+                        <strong class="text-slate-800" id="modal-sku-subcat-tier">-</strong>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50/70 p-4 rounded-xl border border-blue-100 space-y-2">
+                    <h4 class="font-bold text-blue-900 text-xs border-b border-blue-200 pb-1.5 flex justify-between">
+                        <span>재고 자산 상세 정보</span>
+                        <span class="text-[10px] bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded">기준 정보</span>
+                    </h4>
+                    <div class="grid grid-cols-2 gap-4 pt-1">
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">공급기준가</span>
+                                <span class="font-semibold text-slate-800" id="modal-sku-supply">0 원</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">기준원가</span>
+                                <span class="font-semibold text-slate-800" id="modal-sku-basecost">0 원</span>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-slate-600">기준수량</span>
+                                <span class="font-bold text-slate-900" id="modal-sku-baseqty">0</span>
+                            </div>
+                            <div class="flex justify-between pt-1 border-t border-blue-200/60">
+                                <span class="font-bold text-blue-900">기준금액</span>
+                                <span class="font-extrabold text-blue-700 text-sm" id="modal-sku-baseamt">0 원</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-3 border-t border-slate-100 flex justify-end">
+                <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium transition">
+                    확인 및 닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Dialog for File Upload -->
+    <div id="upload-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100 transform transition-all">
+            <div class="bg-slate-900 text-white p-5 flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                        <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold">재고 데이터 업로드 및 저장</h3>
+                        <p class="text-[11px] text-slate-400">업로드 시 개별 데이터 세트로 신규 등록 및 자동 보관됩니다</p>
+                    </div>
+                </div>
+                <button onclick="closeUploadModal()" class="text-slate-400 hover:text-white transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div id="upload-status-box" class="hidden p-3 rounded-xl text-xs font-medium border"></div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">데이터 세트 별칭 (선택 사항)</label>
+                    <input type="text" id="upload-dataset-name" placeholder="예: 2026년 8월 26일 정기 재고조사" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <div id="drop-zone" 
+                     onclick="document.getElementById('file-input').click()" 
+                     ondragover="handleDragOver(event)" 
+                     ondragleave="handleDragLeave(event)" 
+                     ondrop="handleFileDrop(event)" 
+                     class="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 flex flex-col items-center justify-center bg-slate-50 hover:bg-emerald-50/30 transition cursor-pointer group text-center">
+                    
+                    <input type="file" id="file-input" accept=".csv, .json, .xlsx, .xls" class="hidden" onchange="handleFileSelect(event)">
+                    
+                    <div class="p-3 bg-white rounded-full shadow-md border border-slate-100 group-hover:scale-110 transition duration-200 mb-3">
+                        <i data-lucide="file-up" class="w-8 h-8 text-emerald-600"></i>
+                    </div>
+                    
+                    <p class="text-xs font-bold text-slate-700 group-hover:text-emerald-700">클릭하여 파일 선택 또는 드래그 & 드롭</p>
+                    <p class="text-[11px] text-slate-400 mt-1">지원 형식: CSV, XLSX, XLS (.csv, .xlsx, .xls)</p>
+                </div>
+
+                <div id="selected-file-info" class="hidden bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between">
+                    <div class="flex items-center space-x-3 overflow-hidden">
+                        <div class="p-2 bg-emerald-600 text-white rounded-lg flex-shrink-0">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        </div>
+                        <div class="truncate">
+                            <div class="text-xs font-bold text-emerald-900 truncate" id="file-name-text">filename.csv</div>
+                            <div class="text-[10px] text-emerald-700" id="file-size-text">0 KB</div>
+                        </div>
+                    </div>
+                    <button onclick="clearSelectedFile(event)" class="text-emerald-700 hover:text-emerald-950 p-1">
+                        <i data-lucide="x-circle" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
+                    <div class="font-semibold text-slate-800 flex items-center space-x-1">
+                        <i data-lucide="info" class="w-3.5 h-3.5 text-blue-500"></i>
+                        <span>17개 표준 컬럼 양식 안내</span>
+                    </div>
+                    <p class="text-slate-500 pl-4">대구분, 중구분, 소구분, 원산지, 가격등급, 상품, 창고코드, 창고명, 상품명, 유통년도, 공급기준가, 비교원가, 비교수량, 비교금액, 기준원가, 기준수량, 기준금액</p>
+                    <div class="pt-1 pl-4">
+                        <button onclick="downloadSampleTemplate()" class="text-blue-600 hover:underline font-medium inline-flex items-center gap-1">
+                            <i data-lucide="download" class="w-3 h-3"></i>
+                            샘플 CSV 양식 다운로드
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 px-6 py-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                <button onclick="closeUploadModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-medium transition">
+                    취소
+                </button>
+                <button id="btn-submit-upload" onclick="processUploadedFile()" disabled class="px-4 py-2 bg-slate-300 text-slate-500 rounded-lg text-xs font-bold transition cursor-not-allowed flex items-center space-x-1.5">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                    <span>업로드 및 신규 세트 저장</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'yongpum-inventory-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+        let app, db, auth, currentUser = null;
+
+        if (firebaseConfig) {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+            } catch(e) {
+                console.warn("Firebase initialization warning:", e);
+            }
+        }
+
+        window.firebaseStore = {
+            db, auth, appId,
+            async initAuth() {
+                if (!auth) return;
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        const userCredential = await signInWithCustomToken(auth, __initial_auth_token);
+                        currentUser = userCredential.user;
+                    } else {
+                        const userCredential = await signInAnonymously(auth);
+                        currentUser = userCredential.user;
+                    }
+                    this.subscribeFirestore();
+                } catch (err) {
+                    console.error("Firebase auth error:", err);
+                }
+            },
+            async saveDatasetDoc(dataset) {
+                if (!db || !appId) return false;
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory_datasets', dataset.id);
+                    await setDoc(docRef, {
+                        ...dataset,
+                        updatedAt: new Date().toISOString()
+                    });
+                    return true;
+                } catch (err) {
+                    console.error("Firestore save error:", err);
+                    return false;
+                }
+            },
+            async deleteDatasetDoc(datasetId) {
+                if (!db || !appId) return false;
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory_datasets', datasetId);
+                    await deleteDoc(docRef);
+                    return true;
+                } catch (err) {
+                    console.error("Firestore delete error:", err);
+                    return false;
+                }
+            },
+            subscribeFirestore() {
+                if (!db || !appId) return;
+                const datasetsColl = collection(db, 'artifacts', appId, 'public', 'data', 'inventory_datasets');
+                onSnapshot(datasetsColl, (snapshot) => {
+                    let hasDocs = false;
+                    snapshot.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if (data && data.id && Array.isArray(data.items)) {
+                            hasDocs = true;
+                            const existingIdx = window.savedDatasets.findIndex(d => d.id === data.id);
+                            if (existingIdx >= 0) {
+                                window.savedDatasets[existingIdx] = data;
+                            } else {
+                                window.savedDatasets.push(data);
+                            }
+                        }
+                    });
+                    if (hasDocs) {
+                        window.updateDatasetUI();
+                    }
+                }, (error) => {
+                    console.error("Firestore subscription error:", error);
+                });
+            }
+        };
+
+        window.firebaseStore.initAuth();
+    </script>
+
+    <script>
+        let selectedFile = null;
+
+        // Default initial dataset
+        const defaultDatasetItems = [
+            {
+                cat: "GOLF", midcat: "골프백", subcat: "CADDY BAG", origin: "CN", priceTier: "A등급",
+                code: "YG1189GF006", whCode: "A00010", whName: "온라인창고", name: "CB-8907EX (GT CADDIE BAG)", distYear: "2026년",
+                supplyPrice: 0, compCost: 230000, compQty: 2, compAmt: 460000, baseCost: 230000, baseQty: 2, baseAmt: 460000
+            },
+            {
+                cat: "GOLF", midcat: "페어웨이우드", subcat: "EZONE", origin: "JP", priceTier: "S등급",
+                code: "YG1229GF003", whCode: "A00010", whName: "온라인창고", name: "NEW EZONE GT 3 F/W #3H", distYear: "2026년",
+                supplyPrice: 0, compCost: 260000, compQty: 2, compAmt: 520000, baseCost: 260000, baseQty: 2, baseAmt: 520000
+            },
+            {
+                cat: "GOLF", midcat: "아이언", subcat: "EZONE", origin: "JP", priceTier: "S등급",
+                code: "YG1229GF010", whCode: "A00010", whName: "온라인창고", name: "NEW EZONE GT 3 IRON 8S", distYear: "2026년",
+                supplyPrice: 0, compCost: 1250000, compQty: 8, compAmt: 10000000, baseCost: 1250000, baseQty: 8, baseAmt: 10000000
+            },
+            {
+                cat: "배드민턴", midcat: "라켓", subcat: "ASTROX", origin: "JP", priceTier: "S등급",
+                code: "BD1001AX001", whCode: "A00010", whName: "온라인창고", name: "ASTROX 88D PRO 4U5", distYear: "2026년",
+                supplyPrice: 180000, compCost: 150000, compQty: 150, compAmt: 22500000, baseCost: 150000, baseQty: 160, baseAmt: 24000000
+            },
+            {
+                cat: "배드민턴", midcat: "신발", subcat: "POWER CUSHION", origin: "VN", priceTier: "A등급",
+                code: "BD2002SH005", whCode: "A00010", whName: "온라인창고", name: "POWER CUSHION 65Z3", distYear: "2026년",
+                supplyPrice: 110000, compCost: 90000, compQty: 200, compAmt: 18000000, baseCost: 90000, baseQty: 220, baseAmt: 19800000
+            },
+            {
+                cat: "배드민턴", midcat: "셔틀콕", subcat: "AEROSENSA", origin: "CN", priceTier: "B등급",
+                code: "BD3003SH012", whCode: "A00020", whName: "용품제1창고", name: "AEROSENSA 50 (12개입)", distYear: "2026년",
+                supplyPrice: 32000, compCost: 28000, compQty: 1000, compAmt: 28000000, baseCost: 28000, baseQty: 1200, baseAmt: 33600000
+            },
+            {
+                cat: "테니스", midcat: "라켓", subcat: "PERCEPT", origin: "JP", priceTier: "S등급",
+                code: "TN1001PC002", whCode: "A00010", whName: "온라인창고", name: "PERCEPT 97 (310g)", distYear: "2026년",
+                supplyPrice: 220000, compCost: 185000, compQty: 80, compAmt: 14800000, baseCost: 185000, baseQty: 85, baseAmt: 15725000
+            },
+            {
+                cat: "테니스", midcat: "신발", subcat: "ECLIPSE", origin: "VN", priceTier: "A등급",
+                code: "TN2002SH008", whCode: "A00020", whName: "용품제1창고", name: "POWER CUSHION ECLIPSION 4", distYear: "2026년",
+                supplyPrice: 125000, compCost: 105000, compQty: 120, compAmt: 12600000, baseCost: 105000, baseQty: 130, baseAmt: 13650000
+            },
+            {
+                cat: "런닝슈즈", midcat: "런닝슈즈", subcat: "CARBON", origin: "VN", priceTier: "S등급",
+                code: "RN1001SH001", whCode: "A00030", whName: "용품제2창고", name: "SAFERUN CR PRO MENS", distYear: "2026년",
+                supplyPrice: 150000, compCost: 120000, compQty: 90, compAmt: 10800000, baseCost: 120000, baseQty: 100, baseAmt: 12000000
+            },
+            {
+                cat: "의류", midcat: "티셔츠", subcat: "DRY-FIT", origin: "KR", priceTier: "B등급",
+                code: "CL1001TS004", whCode: "A00030", whName: "용품제2창고", name: "남성 라운드 반팔 티셔츠", distYear: "2026년",
+                supplyPrice: 45000, compCost: 35000, compQty: 500, compAmt: 17500000, baseCost: 35000, baseQty: 550, baseAmt: 19250000
+            }
+        ];
+
+        // Global multi-dataset array
+        window.savedDatasets = [
+            {
+                id: "ds_default_20260826",
+                displayName: "2026년 8월 26일 기본 재고 원가 세트",
+                fileName: "일자비교재고원가조회_260826.xls",
+                baseDate: "2026년 08월 26일",
+                uploadedAt: "2026-08-26 09:00:00",
+                items: [...defaultDatasetItems],
+                isActive: true
+            }
+        ];
+
+        let activeDatasetId = "ds_default_20260826";
+        let rawInventoryData = [...defaultDatasetItems];
+        let filteredData = [...rawInventoryData];
+
+        let currentPage = 1;
+        let pageSize = 20;
+        let activeTab = 'overview';
+
+        let categoryChartInstance = null;
+        let subcategoryChartInstance = null;
+        let categoryChartDetailInstance = null;
+        let subcategoryChartDetailInstance = null;
+
+        window.onload = function() {
+            lucide.createIcons();
+            updateDatasetUI();
+            switchTab('overview');
+        };
+
+        function updateDatasetUI() {
+            updateDateDropdown();
+            renderManagementTable();
+            loadActiveDatasetData();
+        }
+        window.updateDatasetUI = updateDatasetUI;
+
+        function updateDateDropdown() {
+            const selectEl = document.getElementById('sidebar-base-date-select');
+            if (!selectEl) return;
+
+            selectEl.innerHTML = '';
+            
+            // Extract unique base dates from saved datasets
+            const datesMap = {};
+            window.savedDatasets.forEach(ds => {
+                if (!datesMap[ds.baseDate]) {
+                    datesMap[ds.baseDate] = ds.id;
+                }
+            });
+
+            Object.keys(datesMap).forEach(date => {
+                const opt = document.createElement('option');
+                opt.value = date;
+                opt.textContent = date;
+                selectEl.appendChild(opt);
+            });
+
+            const activeDs = window.savedDatasets.find(d => d.id === activeDatasetId) || window.savedDatasets[0];
+            if (activeDs) {
+                selectEl.value = activeDs.baseDate;
+            }
+
+            const badgeEl = document.getElementById('sidebar-dataset-count-badge');
+            if (badgeEl) badgeEl.textContent = window.savedDatasets.length;
+        }
+
+        function onDateChange(selectedDate) {
+            const targetDs = window.savedDatasets.find(d => d.baseDate === selectedDate);
+            if (targetDs) {
+                setActiveDataset(targetDs.id);
+            }
+        }
+
+        function setActiveDataset(datasetId) {
+            window.savedDatasets.forEach(ds => {
+                ds.isActive = (ds.id === datasetId);
+            });
+            activeDatasetId = datasetId;
+            loadActiveDatasetData();
+            renderManagementTable();
+            updateDateDropdown();
+        }
+
+        function loadActiveDatasetData() {
+            const activeDs = window.savedDatasets.find(d => d.id === activeDatasetId) || window.savedDatasets[0];
+            if (activeDs) {
+                rawInventoryData = [...activeDs.items];
+            } else {
+                rawInventoryData = [];
+            }
+            populateCategoryFilterOptions();
+            handleFilterChange();
+        }
+
+        function applyFiltersAndRender() {
+            handleFilterChange();
+        }
+
+        function renderAll() {
+            updateKPICards();
+            renderTable();
+            renderPagination();
+            renderCategorySummaryTable();
+            renderCharts();
+        }
+
+        function updateKPICards() {
+            let totalAmt = 0;
+            let totalQty = 0;
+            const catSums = {};
+
+            filteredData.forEach(item => {
+                totalAmt += item.baseAmt || 0;
+                totalQty += item.baseQty || 0;
+                catSums[item.cat] = (catSums[item.cat] || 0) + (item.baseAmt || 0);
+            });
+
+            const skuCount = filteredData.length;
+            const avgAmt = skuCount > 0 ? Math.round(totalAmt / skuCount) : 0;
+
+            let topCat = '-';
+            let topCatAmt = 0;
+            Object.entries(catSums).forEach(([cat, amt]) => {
+                if (amt > topCatAmt) {
+                    topCatAmt = amt;
+                    topCat = cat;
+                }
+            });
+
+            const topCatRatio = totalAmt > 0 ? ((topCatAmt / totalAmt) * 100).toFixed(1) : '0';
+            const totalAmtInEok = (totalAmt / 100000000).toFixed(2);
+
+            const headerTotalEl = document.getElementById('header-total-amount');
+            if (headerTotalEl) headerTotalEl.textContent = totalAmt.toLocaleString() + ' 원';
+
+            const kpiTotalAmtEl = document.getElementById('kpi-total-amount');
+            if (kpiTotalAmtEl) kpiTotalAmtEl.textContent = totalAmt.toLocaleString() + ' 원';
+
+            const kpiUnitEl = document.getElementById('kpi-total-amount-unit');
+            if (kpiUnitEl) kpiUnitEl.textContent = totalAmtInEok + ' 억원';
+
+            const kpiQtyEl = document.getElementById('kpi-total-qty');
+            if (kpiQtyEl) kpiQtyEl.textContent = totalQty.toLocaleString() + ' EA';
+
+            const kpiSkuEl = document.getElementById('kpi-total-sku');
+            if (kpiSkuEl) kpiSkuEl.textContent = skuCount.toLocaleString() + ' 개';
+
+            const kpiAvgEl = document.getElementById('kpi-avg-amount');
+            if (kpiAvgEl) kpiAvgEl.textContent = avgAmt.toLocaleString() + '원';
+
+            const kpiTopCatEl = document.getElementById('kpi-top-category');
+            if (kpiTopCatEl) kpiTopCatEl.textContent = topCat;
+
+            const kpiTopRatioEl = document.getElementById('kpi-top-category-ratio');
+            if (kpiTopRatioEl) kpiTopRatioEl.textContent = topCatRatio + '%';
+
+            const sidebarBadgeEl = document.getElementById('sidebar-count-badge');
+            if (sidebarBadgeEl) sidebarBadgeEl.textContent = skuCount;
+
+            const filteredCountEl = document.getElementById('filtered-count');
+            if (filteredCountEl) filteredCountEl.textContent = skuCount + '건';
+        }
+
+        // Render Table (Columns: No., 대구분, 중구분, 소구분, 원산지, 창고명, 상품명, 유통년도, 공급기준가, 기준원가, 기준수량, 기준금액, 상세)
+        function renderTable() {
+            const tbody = document.getElementById('inventory-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="13" class="py-8 text-center text-slate-400">
+                            조회된 재고 데이터가 없습니다.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const start = (currentPage - 1) * pageSize;
+            const pageItems = filteredData.slice(start, start + pageSize);
+
+            pageItems.forEach((item, idx) => {
+                const rowNo = start + idx + 1;
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+                tr.innerHTML = `
+                    <td class="py-3 px-3 text-center text-slate-400 font-mono text-[11px]">${rowNo}</td>
+                    <td class="py-3 px-3 text-slate-600"><span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-medium">${item.cat || '-'}</span></td>
+                    <td class="py-3 px-3 text-slate-600">${item.midcat || '-'}</td>
+                    <td class="py-3 px-3 text-slate-500">${item.subcat || '-'}</td>
+                    <td class="py-3 px-3 text-center text-slate-600">${item.origin || '-'}</td>
+                    <td class="py-3 px-3 text-slate-700 font-medium">${item.whName || '-'}</td>
+                    <td class="py-3 px-3 font-semibold text-slate-900">${item.name || '-'}</td>
+                    <td class="py-3 px-3 text-center text-slate-500">${item.distYear || '-'}</td>
+                    <td class="py-3 px-3 text-right text-slate-600">${(item.supplyPrice || 0).toLocaleString()} 원</td>
+                    <td class="py-3 px-3 text-right text-slate-600">${(item.baseCost || 0).toLocaleString()} 원</td>
+                    <td class="py-3 px-3 text-right font-medium text-slate-700">${(item.baseQty || 0).toLocaleString()}</td>
+                    <td class="py-3 px-3 text-right font-bold text-blue-900 bg-blue-50/50">${(item.baseAmt || 0).toLocaleString()} 원</td>
+                    <td class="py-3 px-3 text-center">
+                        <button onclick="openModalByCode('${item.code}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition font-medium text-[11px]">
+                            상세
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderManagementTable() {
+            const tbody = document.getElementById('management-dataset-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const totalDatasets = window.savedDatasets.length;
+            const activeDs = window.savedDatasets.find(d => d.id === activeDatasetId) || window.savedDatasets[0];
+
+            let activeTotalAmt = 0;
+            if (activeDs) {
+                activeTotalAmt = activeDs.items.reduce((sum, item) => sum + (item.baseAmt || 0), 0);
+            }
+
+            const statTotalEl = document.getElementById('mgmt-stat-total-datasets');
+            if (statTotalEl) statTotalEl.textContent = `${totalDatasets} 개`;
+            
+            const statDateEl = document.getElementById('mgmt-stat-active-date');
+            if (statDateEl) statDateEl.textContent = activeDs ? activeDs.baseDate : '-';
+            
+            const statAmtEl = document.getElementById('mgmt-stat-active-amount');
+            if (statAmtEl) statAmtEl.textContent = `${activeTotalAmt.toLocaleString()} 원`;
+
+            window.savedDatasets.forEach((ds) => {
+                const totalAmt = ds.items.reduce((sum, item) => sum + (item.baseAmt || 0), 0);
+                const isActive = (ds.id === activeDatasetId);
+
+                const tr = document.createElement('tr');
+                tr.className = `hover:bg-slate-50 transition border-b border-slate-100 ${isActive ? 'bg-purple-50/30' : ''}`;
+                tr.innerHTML = `
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-slate-900 text-xs">${ds.displayName || ds.fileName}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${ds.fileName}</div>
+                    </td>
+                    <td class="py-3 px-3 font-semibold text-slate-700">${ds.baseDate}</td>
+                    <td class="py-3 px-3 text-slate-500 text-[11px]">${ds.uploadedAt || '-'}</td>
+                    <td class="py-3 px-3 text-center font-medium text-slate-700">${ds.items.length.toLocaleString()} 개</td>
+                    <td class="py-3 px-3 text-right font-bold text-slate-900">${totalAmt.toLocaleString()} 원</td>
+                    <td class="py-3 px-3 text-center">
+                        ${isActive ? 
+                            '<span class="px-2.5 py-1 bg-purple-600 text-white font-bold rounded-full text-[10px]">활성 세트</span>' : 
+                            '<span class="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px]">보관 중</span>'}
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <div class="flex items-center justify-center space-x-1.5">
+                            ${!isActive ? `
+                                <button onclick="setActiveDataset('${ds.id}')" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-[11px] font-semibold transition">
+                                    적용
+                                </button>
+                            ` : `
+                                <span class="px-2 py-1 text-purple-700 font-bold text-[11px]">사용 중</span>
+                            `}
+                            <button onclick="promptRenameDataset('${ds.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] transition">
+                                이름변경
+                            </button>
+                            ${window.savedDatasets.length > 1 ? `
+                                <button onclick="deleteDataset('${ds.id}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-[11px] transition">
+                                    삭제
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function promptRenameDataset(datasetId) {
+            const ds = window.savedDatasets.find(d => d.id === datasetId);
+            if (!ds) return;
+            const newName = prompt('데이터 세트의 명칭을 입력하세요:', ds.displayName || ds.fileName);
+            if (newName && newName.trim()) {
+                ds.displayName = newName.trim();
+                if (window.firebaseStore && window.firebaseStore.saveDatasetDoc) {
+                    window.firebaseStore.saveDatasetDoc(ds);
+                }
+                updateDatasetUI();
+            }
+        }
+
+        function deleteDataset(datasetId) {
+            if (window.savedDatasets.length <= 1) return;
+            const ds = window.savedDatasets.find(d => d.id === datasetId);
+            if (!ds) return;
+
+            window.savedDatasets = window.savedDatasets.filter(d => d.id !== datasetId);
+            if (activeDatasetId === datasetId) {
+                activeDatasetId = window.savedDatasets[0].id;
+            }
+
+            if (window.firebaseStore && window.firebaseStore.deleteDatasetDoc) {
+                window.firebaseStore.deleteDatasetDoc(datasetId);
+            }
+
+            updateDatasetUI();
+        }
+
+        // Tab Switching Handler
+        function switchTab(tabId) {
+            activeTab = tabId;
+
+            const tabs = ['overview', 'category', 'navigation', 'management', 'all'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`nav-${t}`);
+                if (btn) {
+                    if (t === tabId) {
+                        btn.className = "w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition duration-150 nav-tab-active";
+                    } else {
+                        btn.className = "w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs transition duration-150 text-slate-300 hover:bg-slate-800 hover:text-white font-medium";
+                    }
+                }
+
+                const container = document.getElementById(`tab-view-${t}`);
+                if (container) {
+                    if (tabId === 'all') {
+                        container.classList.remove('hidden');
+                    } else if (t === tabId) {
+                        container.classList.remove('hidden');
+                    } else {
+                        container.classList.add('hidden');
+                    }
+                }
+            });
+
+            const headerTitleMap = {
+                'overview': '재고 자산 현황 대시보드 개요',
+                'category': '카테고리(대구분/중구분) 입체 분석',
+                'navigation': '재고금액(기준금액) 데이터 탐색 페이지',
+                'management': '업로드 데이터 세트 목록 및 버전 관리',
+                'all': '용품사업부 재고 자산 전체 보고서'
+            };
+            const breadcrumbMap = {
+                'overview': '대시보드 개요',
+                'category': '카테고리 분석',
+                'navigation': '데이터 탐색',
+                'management': '데이터 관리',
+                'all': '전체 보고서 보기'
+            };
+
+            document.getElementById('header-title').textContent = headerTitleMap[tabId] || '재고 자산 관리 대시보드';
+            document.getElementById('breadcrumb-active').textContent = breadcrumbMap[tabId] || '대시보드 개요';
+
+            if (tabId === 'overview' || tabId === 'category' || tabId === 'all') {
+                setTimeout(renderCharts, 100);
+            }
+        }
+
+        function populateCategoryFilterOptions() {
+            const catSelect = document.getElementById('filter-category');
+            const whSelect = document.getElementById('filter-warehouse');
+            if (!catSelect || !whSelect) return;
+
+            const categories = [...new Set(rawInventoryData.map(item => item.cat))].filter(Boolean);
+            const warehouses = [...new Set(rawInventoryData.map(item => item.whName))].filter(Boolean);
+
+            catSelect.innerHTML = '<option value="">전체 대구분</option>';
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                catSelect.appendChild(opt);
+            });
+
+            whSelect.innerHTML = '<option value="">전체 창고</option>';
+            warehouses.forEach(wh => {
+                const opt = document.createElement('option');
+                opt.value = wh;
+                opt.textContent = wh;
+                whSelect.appendChild(opt);
+            });
+            
+            updateMidCategoryDropdown();
+        }
+
+        function handleCategoryChange() {
+            updateMidCategoryDropdown();
+            handleFilterChange();
+        }
+
+        function handleMidCategoryChange() {
+            updateSubCategoryDropdown();
+            handleFilterChange();
+        }
+
+        function updateMidCategoryDropdown() {
+            const selectedCat = document.getElementById('filter-category').value;
+            const midcatSelect = document.getElementById('filter-midcategory');
+            if (!midcatSelect) return;
+
+            midcatSelect.innerHTML = '<option value="">전체 중구분</option>';
+
+            let midcategories = [];
+            if (selectedCat) {
+                midcategories = [...new Set(rawInventoryData.filter(i => i.cat === selectedCat).map(i => i.midcat))].filter(Boolean);
+            } else {
+                midcategories = [...new Set(rawInventoryData.map(i => i.midcat))].filter(Boolean);
+            }
+
+            midcategories.forEach(mid => {
+                const opt = document.createElement('option');
+                opt.value = mid;
+                opt.textContent = mid;
+                midcatSelect.appendChild(opt);
+            });
+
+            updateSubCategoryDropdown();
+        }
+
+        function updateSubCategoryDropdown() {
+            const selectedCat = document.getElementById('filter-category').value;
+            const selectedMidcat = document.getElementById('filter-midcategory').value;
+            const subcatSelect = document.getElementById('filter-subcategory');
+            if (!subcatSelect) return;
+
+            subcatSelect.innerHTML = '<option value="">전체 소구분</option>';
+
+            let subcategories = rawInventoryData;
+            if (selectedCat) subcategories = subcategories.filter(i => i.cat === selectedCat);
+            if (selectedMidcat) subcategories = subcategories.filter(i => i.midcat === selectedMidcat);
+
+            const subs = [...new Set(subcategories.map(i => i.subcat))].filter(Boolean);
+            subs.forEach(sub => {
+                const opt = document.createElement('option');
+                opt.value = sub;
+                opt.textContent = sub;
+                subcatSelect.appendChild(opt);
+            });
+        }
+
+        function handleFilterChange() {
+            const searchEl = document.getElementById('filter-search');
+            const catEl = document.getElementById('filter-category');
+            const midcatEl = document.getElementById('filter-midcategory');
+            const subcatEl = document.getElementById('filter-subcategory');
+            const whEl = document.getElementById('filter-warehouse');
+            const sortEl = document.getElementById('filter-sort');
+
+            const searchText = searchEl ? searchEl.value.trim().toLowerCase() : '';
+            const selectedCat = catEl ? catEl.value : '';
+            const selectedMidcat = midcatEl ? midcatEl.value : '';
+            const selectedSubcat = subcatEl ? subcatEl.value : '';
+            const selectedWH = whEl ? whEl.value : '';
+            const sortOption = sortEl ? sortEl.value : 'baseAmt-desc';
+
+            filteredData = rawInventoryData.filter(item => {
+                const matchSearch = !searchText || 
+                    (item.name && item.name.toLowerCase().includes(searchText)) || 
+                    (item.code && item.code.toLowerCase().includes(searchText)) ||
+                    (item.whName && item.whName.toLowerCase().includes(searchText));
+
+                const matchCat = !selectedCat || item.cat === selectedCat;
+                const matchMidcat = !selectedMidcat || item.midcat === selectedMidcat;
+                const matchSubcat = !selectedSubcat || item.subcat === selectedSubcat;
+                const matchWH = !selectedWH || item.whName === selectedWH;
+
+                return matchSearch && matchCat && matchMidcat && matchSubcat && matchWH;
+            });
+
+            filteredData.sort((a, b) => {
+                if (sortOption === 'baseAmt-desc') return (b.baseAmt || 0) - (a.baseAmt || 0);
+                if (sortOption === 'baseAmt-asc') return (a.baseAmt || 0) - (b.baseAmt || 0);
+                if (sortOption === 'baseQty-desc') return (b.baseQty || 0) - (a.baseQty || 0);
+                if (sortOption === 'name-asc') return (a.name || '').localeCompare(b.name || '', 'ko');
+                return 0;
+            });
+
+            currentPage = 1;
+            renderAll();
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+            const paginationInfo = document.getElementById('pagination-info');
+            const start = filteredData.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+            const end = Math.min(currentPage * pageSize, filteredData.length);
+            if (paginationInfo) paginationInfo.textContent = `${start} - ${end} / 전체 ${filteredData.length}개`;
+
+            const container = document.getElementById('pagination-buttons');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.className = `px-2.5 py-1 rounded text-xs border ${currentPage === 1 ? 'opacity-50 cursor-not-allowed bg-slate-100' : 'hover:bg-slate-200 bg-white'}`;
+            prevBtn.innerHTML = '<i data-lucide="chevron-left" class="w-3.5 h-3.5 inline"></i>';
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.onclick = () => { if(currentPage > 1) { currentPage--; renderTable(); renderPagination(); } };
+            container.appendChild(prevBtn);
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (totalPages > 7 && Math.abs(i - currentPage) > 2 && i !== 1 && i !== totalPages) {
+                    if (i === 2 || i === totalPages - 1) {
+                        const ellipsis = document.createElement('span');
+                        ellipsis.className = 'px-1 text-slate-400';
+                        ellipsis.textContent = '...';
+                        container.appendChild(ellipsis);
+                    }
+                    continue;
+                }
+                const btn = document.createElement('button');
+                btn.className = `px-2.5 py-1 rounded text-xs font-semibold ${i === currentPage ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-700'}`;
+                btn.textContent = i;
+                btn.onclick = () => { currentPage = i; renderTable(); renderPagination(); };
+                container.appendChild(btn);
+            }
+
+            const nextBtn = document.createElement('button');
+            nextBtn.className = `px-2.5 py-1 rounded text-xs border ${currentPage === totalPages || totalPages === 0 ? 'opacity-50 cursor-not-allowed bg-slate-100' : 'hover:bg-slate-200 bg-white'}`;
+            nextBtn.innerHTML = '<i data-lucide="chevron-right" class="w-3.5 h-3.5 inline"></i>';
+            nextBtn.disabled = currentPage === totalPages || totalPages === 0;
+            nextBtn.onclick = () => { if(currentPage < totalPages) { currentPage++; renderTable(); renderPagination(); } };
+            container.appendChild(nextBtn);
+
+            lucide.createIcons();
+        }
+
+        function changePageSize() {
+            const select = document.getElementById('page-size-select');
+            if (select) {
+                pageSize = parseInt(select.value, 10);
+                currentPage = 1;
+                renderTable();
+                renderPagination();
+            }
+        }
+
+        function openModalByCode(code) {
+            const item = rawInventoryData.find(i => i.code === code);
+            if (item) openModal(item);
+        }
+
+        function openModal(item) {
+            if (!item) return;
+            document.getElementById('modal-sku-name').textContent = item.name || '-';
+            document.getElementById('modal-sku-code').textContent = item.code || '-';
+            document.getElementById('modal-sku-wh').textContent = `${item.whCode || ''} / ${item.whName || ''}`;
+            document.getElementById('modal-sku-year-origin').textContent = `${item.distYear || ''} / ${item.origin || ''}`;
+            document.getElementById('modal-sku-cat').textContent = item.cat || '-';
+            document.getElementById('modal-sku-midcat').textContent = item.midcat || '-';
+            document.getElementById('modal-sku-subcat-tier').textContent = `${item.subcat || ''} / ${item.priceTier || ''}`;
+            document.getElementById('modal-sku-supply').textContent = `${(item.supplyPrice || 0).toLocaleString()} 원`;
+            document.getElementById('modal-sku-basecost').textContent = `${(item.baseCost || 0).toLocaleString()} 원`;
+            document.getElementById('modal-sku-baseqty').textContent = `${(item.baseQty || 0).toLocaleString()} EA`;
+            document.getElementById('modal-sku-baseamt').textContent = `${(item.baseAmt || 0).toLocaleString()} 원`;
+
+            document.getElementById('sku-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('sku-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function renderCategorySummaryTable() {
+            const tbody = document.getElementById('category-summary-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const catMap = {};
+            let totalAmt = 0;
+
+            filteredData.forEach(item => {
+                totalAmt += item.baseAmt || 0;
+                const catKey = item.cat || '기타';
+                if (!catMap[catKey]) {
+                    catMap[catKey] = { midcats: new Set(), skus: 0, totalQty: 0, totalAmt: 0 };
+                }
+                if (item.midcat) catMap[catKey].midcats.add(item.midcat);
+                catMap[catKey].skus += 1;
+                catMap[catKey].totalQty += item.baseQty || 0;
+                catMap[catKey].totalAmt += item.baseAmt || 0;
+            });
+
+            Object.entries(catMap).forEach(([cat, data]) => {
+                const ratio = totalAmt > 0 ? ((data.totalAmt / totalAmt) * 100).toFixed(1) : '0';
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+                tr.innerHTML = `
+                    <td class="py-2.5 px-4 font-semibold text-slate-800">${cat}</td>
+                    <td class="py-2.5 px-4 text-slate-600">${data.midcats.size} 개</td>
+                    <td class="py-2.5 px-4 text-slate-600">${data.skus} 개</td>
+                    <td class="py-2.5 px-4 text-right font-medium text-slate-700">${data.totalQty.toLocaleString()}</td>
+                    <td class="py-2.5 px-4 text-right font-bold text-slate-900">${data.totalAmt.toLocaleString()} 원</td>
+                    <td class="py-2.5 px-4 text-right text-blue-600 font-semibold">${ratio}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCharts() {
+            const catSums = {};
+            const midcatSums = {};
+
+            filteredData.forEach(item => {
+                const catKey = item.cat || '기타';
+                const midKey = item.midcat || '기타';
+                catSums[catKey] = (catSums[catKey] || 0) + (item.baseAmt || 0);
+                midcatSums[midKey] = (midcatSums[midKey] || 0) + (item.baseAmt || 0);
+            });
+
+            const catLabels = Object.keys(catSums);
+            const catValues = Object.values(catSums);
+
+            const sortedMidcats = Object.entries(midcatSums).sort((a, b) => b[1] - a[1]).slice(0, 8);
+            const midcatLabels = sortedMidcats.map(x => x[0]);
+            const midcatValues = sortedMidcats.map(x => x[1]);
+
+            const colors = ['#0284c7', '#6366f1', '#a855f7', '#10b981', '#f59e0b', '#ec4899', '#64748b'];
+
+            const catCtx = document.getElementById('categoryChart')?.getContext('2d');
+            if (catCtx) {
+                if (categoryChartInstance) categoryChartInstance.destroy();
+                categoryChartInstance = new Chart(catCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{ data: catValues, backgroundColor: colors, borderWidth: 2, borderColor: '#ffffff' }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { font: { family: 'Noto Sans KR', size: 11 }, boxWidth: 12 } } }
+                    }
+                });
+            }
+
+            const subCtx = document.getElementById('subcategoryChart')?.getContext('2d');
+            if (subCtx) {
+                if (subcategoryChartInstance) subcategoryChartInstance.destroy();
+                subcategoryChartInstance = new Chart(subCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: midcatLabels,
+                        datasets: [{ label: '기준금액 (원)', data: midcatValues, backgroundColor: '#6366f1', borderRadius: 6 }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { font: { family: 'Noto Sans KR', size: 10 } } },
+                            y: { ticks: { font: { family: 'Noto Sans KR', size: 11 } } }
+                        }
+                    }
+                });
+            }
+
+            const catDetailCtx = document.getElementById('categoryChartDetail')?.getContext('2d');
+            if (catDetailCtx) {
+                if (categoryChartDetailInstance) categoryChartDetailInstance.destroy();
+                categoryChartDetailInstance = new Chart(catDetailCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{ data: catValues, backgroundColor: colors }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right' } }
+                    }
+                });
+            }
+
+            const subDetailCtx = document.getElementById('subcategoryChartDetail')?.getContext('2d');
+            if (subDetailCtx) {
+                if (subcategoryChartDetailInstance) subcategoryChartDetailInstance.destroy();
+                subcategoryChartDetailInstance = new Chart(subDetailCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: midcatLabels,
+                        datasets: [{ label: '기준금액 (원)', data: midcatValues, backgroundColor: '#0284c7', borderRadius: 6 }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+
+        function resetAllFilters() {
+            document.getElementById('filter-search').value = '';
+            document.getElementById('filter-category').value = '';
+            updateMidCategoryDropdown();
+            document.getElementById('filter-midcategory').value = '';
+            updateSubCategoryDropdown();
+            document.getElementById('filter-subcategory').value = '';
+            document.getElementById('filter-warehouse').value = '';
+            document.getElementById('filter-sort').value = 'baseAmt-desc';
+            handleFilterChange();
+        }
+
+        // Export filtered items to CSV
+        function exportToCSV() {
+            if (!filteredData || filteredData.length === 0) {
+                alert('내보낼 데이터가 없습니다.');
+                return;
+            }
+
+            const headers = [
+                '대구분', '중구분', '소구분', '원산지', '가격등급', '상품(코드)', 
+                '창고코드', '창고명', '상품명', '유통년도', '공급기준가', 
+                '비교원가', '비교수량', '비교금액', '기준원가', '기준수량', '기준금액'
+            ];
+
+            const rows = filteredData.map(item => [
+                `"${item.cat || ''}"`, `"${item.midcat || ''}"`, `"${item.subcat || ''}"`,
+                `"${item.origin || ''}"`, `"${item.priceTier || ''}"`, `"${item.code || ''}"`,
+                `"${item.whCode || ''}"`, `"${item.whName || ''}"`, `"${item.name || ''}"`,
+                `"${item.distYear || ''}"`, item.supplyPrice || 0, item.compCost || 0,
+                item.compQty || 0, item.compAmt || 0, item.baseCost || 0,
+                item.baseQty || 0, item.baseAmt || 0
+            ]);
+
+            const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `재고자산조회_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Download Sample CSV Template
+        function downloadSampleTemplate() {
+            const headers = [
+                '대구분', '중구분', '소구분', '원산지', '가격등급', '상품', 
+                '창고코드', '창고명', '상품명', '유통년도', '공급기준가', 
+                '비교원가', '비교수량', '비교금액', '기준원가', '기준수량', '기준금액'
+            ];
+
+            const sampleRows = [
+                ['GOLF', '골프백', 'CADDY BAG', 'CN', 'A등급', 'YG1189GF006', 'A00010', '온라인창고', 'CB-8907EX (GT CADDIE BAG)', '2026년', 0, 230000, 2, 460000, 230000, 2, 460000],
+                ['배드민턴', '라켓', 'ASTROX', 'JP', 'S등급', 'BD1001AX001', 'A00010', '온라인창고', 'ASTROX 88D PRO 4U5', '2026년', 180000, 150000, 150, 22500000, 150000, 160, 24000000]
+            ];
+
+            const csvContent = '\uFEFF' + [headers.join(','), ...sampleRows.map(row => row.map(v => `"${v}"`).join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', '일자비교재고원가조회_샘플.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function openUploadModal() {
+            const modal = document.getElementById('upload-modal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeUploadModal() {
+            const modal = document.getElementById('upload-modal');
+            if (modal) modal.classList.add('hidden');
+            clearSelectedFile();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const zone = document.getElementById('drop-zone');
+            if (zone) zone.classList.add('border-emerald-500', 'bg-emerald-50/50');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const zone = document.getElementById('drop-zone');
+            if (zone) zone.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const zone = document.getElementById('drop-zone');
+            if (zone) zone.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                setSelectedFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files && e.target.files[0]) {
+                setSelectedFile(e.target.files[0]);
+            }
+        }
+
+        function setSelectedFile(file) {
+            selectedFile = file;
+            document.getElementById('file-name-text').textContent = file.name;
+            document.getElementById('file-size-text').textContent = `${(file.size / 1024).toFixed(1)} KB`;
+            document.getElementById('selected-file-info').classList.remove('hidden');
+
+            const customNameInput = document.getElementById('upload-dataset-name');
+            if (customNameInput && !customNameInput.value) {
+                const dateStr = new Date().toLocaleDateString('ko-KR');
+                customNameInput.value = `${file.name.replace(/\.[^/.]+$/, '')} (${dateStr})`;
+            }
+
+            const btn = document.getElementById('btn-submit-upload');
+            if (btn) {
+                btn.disabled = false;
+                btn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-sm";
+            }
+        }
+
+        function clearSelectedFile(e) {
+            if (e) e.stopPropagation();
+            selectedFile = null;
+            document.getElementById('file-input').value = '';
+            document.getElementById('selected-file-info').classList.add('hidden');
+            
+            const nameInput = document.getElementById('upload-dataset-name');
+            if (nameInput) nameInput.value = '';
+
+            const statusBox = document.getElementById('upload-status-box');
+            if (statusBox) statusBox.classList.add('hidden');
+
+            const btn = document.getElementById('btn-submit-upload');
+            if (btn) {
+                btn.disabled = true;
+                btn.className = "px-4 py-2 bg-slate-300 text-slate-500 rounded-lg text-xs font-bold transition cursor-not-allowed flex items-center space-x-1.5";
+            }
+        }
+
+        function showUploadStatus(msg, type = 'error') {
+            const box = document.getElementById('upload-status-box');
+            if (!box) return;
+            box.classList.remove('hidden', 'bg-rose-50', 'text-rose-700', 'border-rose-200', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+            if (type === 'error') {
+                box.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
+            } else {
+                box.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+            }
+            box.textContent = msg;
+        }
+
+        function processUploadedFile() {
+            if (!selectedFile) return;
+
+            const fileName = selectedFile.name.toLowerCase();
+            const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+
+            if (isExcel) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        let targetSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('export')) || workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[targetSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                        
+                        if (jsonData && jsonData.length > 0) {
+                            parseAndApplyInventoryData(jsonData);
+                        } else {
+                            showUploadStatus('엑셀 시트에 읽을 수 있는 데이터가 없습니다.', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Excel parse error:', err);
+                        showUploadStatus('엑셀 파일 분석 중 오류가 발생했습니다.', 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(selectedFile);
+            } else {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const textContent = e.target.result;
+                    if (textContent.includes('')) {
+                        const eucReader = new FileReader();
+                        eucReader.onload = function(e2) {
+                            parseCSVString(e2.target.result);
+                        };
+                        eucReader.readAsText(selectedFile, 'EUC-KR');
+                    } else {
+                        parseCSVString(textContent);
+                    }
+                };
+                reader.readAsText(selectedFile, 'UTF-8');
+            }
+        }
+
+        function parseCSVString(csvText) {
+            Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.data && results.data.length > 0) {
+                        parseAndApplyInventoryData(results.data);
+                    } else {
+                        showUploadStatus('CSV 데이터에서 읽을 수 있는 항목이 없습니다.', 'error');
+                    }
+                },
+                error: function(err) {
+                    console.error('CSV parse error:', err);
+                    showUploadStatus('CSV 파일 분석 중 오류가 발생했습니다.', 'error');
+                }
+            });
+        }
+
+        // Extract base date from file name (e.g., 260826, 20260826, 2026-08-26)
+        function extractDateFromFileName(fileName) {
+            if (!fileName) return null;
+            
+            // 1) YYYY-MM-DD, YYYY.MM.DD, YYYY_MM_DD
+            let match = fileName.match(/(20\d{2})[-._\s\/년\s]*([01]?\d)[-._\s\/월\s]*([0-3]?\d)/);
+            if (match) {
+                return `${match[1]}년 ${match[2].padStart(2, '0')}월 ${match[3].padStart(2, '0')}일`;
+            }
+            
+            // 2) 8 digits (20260826)
+            match = fileName.match(/(20\d{2})([01]\d)([0-3]\d)/);
+            if (match) {
+                return `${match[1]}년 ${match[2]}월 ${match[3]}일`;
+            }
+            
+            // 3) 6 digits (260826)
+            match = fileName.match(/(?:\D|^)(\d{2})([01]\d)([0-3]\d)(?:\D|$)/);
+            if (match) {
+                let yy = parseInt(match[1], 10);
+                let y = (yy < 70 ? 2000 + yy : 1900 + yy).toString();
+                return `${y}년 ${match[2]}월 ${match[3]}일`;
+            }
+            
+            return null;
+        }
+
+        function parseAndApplyInventoryData(parsedRows) {
+            const cleanKey = (key) => key ? String(key).replace(/^\uFEFF/, '').trim().replace(/^["']|["']$/g, '') : '';
+            const fileNameDate = selectedFile ? extractDateFromFileName(selectedFile.name) : null;
+
+            const items = [];
+
+            parsedRows.forEach((rawRow) => {
+                const row = {};
+                Object.keys(rawRow).forEach(k => {
+                    row[cleanKey(k)] = rawRow[k];
+                });
+
+                const getValue = (aliases, defaultVal = '') => {
+                    for (const alias of aliases) {
+                        if (row[alias] !== undefined && row[alias] !== null && String(row[alias]).trim() !== '') {
+                            return String(row[alias]).trim();
+                        }
+                    }
+                    return defaultVal;
+                };
+
+                const parseNum = (aliases, defaultVal = 0) => {
+                    const valStr = getValue(aliases, '');
+                    if (!valStr) return defaultVal;
+                    const cleaned = String(valStr).replace(/,/g, '').replace(/[^\d.-]/g, '');
+                    const parsed = parseInt(cleaned, 10);
+                    return isNaN(parsed) ? defaultVal : parsed;
+                };
+
+                const cat = getValue(['대구분', 'cat', '대분류', '카테고리'], '기타');
+                const midcat = getValue(['중구분', 'midcat', '중분류'], '기타');
+                const subcat = getValue(['소구분', 'subcat', '소분류'], '기타');
+                const origin = getValue(['원산지', 'origin'], 'KR');
+                const priceTier = getValue(['가격등급', 'priceTier', '등급'], '-');
+                const code = getValue(['상품', '품목코드', 'code', '상품코드'], `SKU_${Math.random().toString(36).substr(2, 6)}`);
+                const whCode = getValue(['창고코드', 'whCode'], 'A00010');
+                const whName = getValue(['창고명', 'whName', '창고'], '기본창고');
+                const name = getValue(['상품명', '품목명', 'name'], '미등록 품목');
+                const distYear = getValue(['유통년도', 'distYear', '년도'], '2026년');
+
+                const supplyPrice = parseNum(['공급기준가', 'supplyPrice'], 0);
+                const compCost = parseNum(['비교원가', 'compCost'], 0);
+                const compQty = parseNum(['비교수량', 'compQty'], 0);
+                const compAmt = parseNum(['비교금액', 'compAmt'], compCost * compQty);
+
+                const baseCost = parseNum(['기준원가', 'baseCost'], 0);
+                const baseQty = parseNum(['기준수량', 'baseQty', '수량'], 0);
+                let baseAmt = parseNum(['기준금액', 'baseAmt', '금액'], baseCost * baseQty);
+
+                if (baseAmt === 0 && baseCost > 0 && baseQty > 0) {
+                    baseAmt = baseCost * baseQty;
+                }
+
+                if (name && name !== '미등록 품목') {
+                    items.push({
+                        cat, midcat, subcat, origin, priceTier,
+                        code, whCode, whName, name, distYear,
+                        supplyPrice, compCost, compQty, compAmt,
+                        baseCost, baseQty, baseAmt
+                    });
+                }
+            });
+
+            if (items.length === 0) {
+                showUploadStatus('올바른 품목 데이터가 포함되어 있지 않습니다.', 'error');
+                return;
+            }
+
+            const customNameInput = document.getElementById('upload-dataset-name');
+            const customDisplayName = (customNameInput && customNameInput.value.trim()) ? customNameInput.value.trim() : (selectedFile ? selectedFile.name : '신규 데이터 세트');
+            
+            const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '년 ').replace(/\./g, '일');
+            const baseDate = fileNameDate || todayStr;
+            const newDatasetId = `ds_${Date.now()}`;
+
+            const newDataset = {
+                id: newDatasetId,
+                displayName: customDisplayName,
+                fileName: selectedFile ? selectedFile.name : 'uploaded_file.csv',
+                baseDate: baseDate,
+                uploadedAt: new Date().toLocaleString('ko-KR'),
+                items: items,
+                isActive: true
+            };
+
+            window.savedDatasets.forEach(d => d.isActive = false);
+            window.savedDatasets.unshift(newDataset);
+
+            if (window.firebaseStore && window.firebaseStore.saveDatasetDoc) {
+                window.firebaseStore.saveDatasetDoc(newDataset);
+            }
+
+            activeDatasetId = newDatasetId;
+            updateDatasetUI();
+            closeUploadModal();
+        }
+    </script>
+</body>
+</html>
